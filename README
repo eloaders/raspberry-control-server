@@ -19,7 +19,9 @@ sudo make install
 
 git clone https://github.com/lukasz-skalski/raspberry-control-server.git
 cd raspberry-control-server
-gcc server.c -o server `pkg-config --cflags --libs libwebsockets libudev jansson glib-2.0 gio-2.0` -DDEBUG
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Debug ../
+make
 ./server --port=8080 -n
 
 

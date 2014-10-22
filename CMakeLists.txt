@@ -4,8 +4,8 @@ project(raspberry-control-server)
 
 enable_language(C)
 
-set(CMAKE_C_FLAGS_DEBUG "-DDEBUG -O0 -pipe")
-set(CMAKE_C_FLAGS_RELEASE "-Wall -Wextra -std=c99 -O2 -pipe")
+set(CMAKE_C_FLAGS_DEBUG "-Wall -Wextra -DDEBUG -O0 -pipe")
+set(CMAKE_C_FLAGS_RELEASE "-Wall -Wextra -O2 -pipe -fomit-frame-pointer")
 
 find_package(PkgConfig REQUIRED)
 find_package(OpenSSL REQUIRED)
@@ -18,7 +18,7 @@ add_definitions(${OpenSSL_CFLAGS} ${WEBSOCK_CFLAGS} ${JSON_CFLAGS} ${GLIB2_CFLAG
 
 set(SRCS server.c)
 
-add_executable(server ${SRCS})
-target_link_libraries(server ${OpenSSL_LDFLAGS} ${WEBSOCK_LDFLAGS} ${JSON_LDFLAGS} ${GLIB2_LDFLAGS} ${GIO2_LDFLAGS})
+add_executable(${PROJECT_NAME} ${SRCS})
+target_link_libraries(${PROJECT_NAME} ${OpenSSL_LDFLAGS} ${WEBSOCK_LDFLAGS} ${JSON_LDFLAGS} ${GLIB2_LDFLAGS} ${GIO2_LDFLAGS})
 
-install(TARGETS server RUNTIME DESTINATION usr/bin)
+install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION usr/bin)

@@ -18,10 +18,12 @@
  */
 
 #include <gio/gio.h>
+#include <glib-unix.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <ctype.h>
 #include <dirent.h>
 #include <pwd.h>
 #include <jansson.h>
@@ -627,7 +629,7 @@ cmd_GetProcesses (struct libwebsocket *wsi, unsigned char *buffer)
             {
               struct passwd *pw;
 
-              if (pw = getpwuid ((unsigned int) strtol(fileline + 4, NULL, 10)))
+              if ((pw = getpwuid ((unsigned int) strtol(fileline + 4, NULL, 10))))
                 json_object_set_new (proc_entry_obj, "user", json_string (pw->pw_name));
             }
 
@@ -783,7 +785,7 @@ cmd_SendIR (struct libwebsocket *wsi, unsigned char *buffer)
  * cmd_SetGPIO()
  */
 unsigned int
-cmd_SetGPIO (struct libwebsocket *wsi, unsigned char *buffer, unsigned char *args)
+cmd_SetGPIO (struct libwebsocket *wsi, unsigned char *buffer, char *args)
 {
   FILE *fd;
   char filepath [PATH_MAX];
@@ -834,7 +836,7 @@ cmd_SetGPIO (struct libwebsocket *wsi, unsigned char *buffer, unsigned char *arg
  * cmd_KillProcess()
  */
 unsigned int
-cmd_KillProcess (struct libwebsocket *wsi, unsigned char *buffer, unsigned char *pid_str)
+cmd_KillProcess (struct libwebsocket *wsi, unsigned char *buffer, char *pid_str)
 {
   unsigned int pid;
 
@@ -883,7 +885,7 @@ parse_json (struct libwebsocket *wsi, unsigned char *data,
   int result;
   unsigned int len = 0;
 
-  root = json_loads (data, 0, &error);
+  root = json_loads ((char*) data, 0, &error);
   if(!root)
     {
       print_log (LOG_ERR, "(%p) (cmd_parser) parser error on line %d: %s\n", wsi, error.line, error.text);

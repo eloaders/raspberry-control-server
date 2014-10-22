@@ -22,7 +22,7 @@ cd raspberry-control-server
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Debug ../
 make
-./server --port=8080 -n
+./raspberry-control-server --port=8080 -n
 
 
 shellinabox

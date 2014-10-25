@@ -15,10 +15,11 @@ pkg_check_modules(GLIB2 REQUIRED glib-2.0)
 pkg_check_modules(GIO2 REQUIRED gio-2.0)
 
 add_definitions(${OpenSSL_CFLAGS} ${WEBSOCK_CFLAGS} ${JSON_CFLAGS} ${GLIB2_CFLAGS} ${GIO2_CFLAGS})
+add_library(devman STATIC devman.c)
 
 set(SRCS server.c)
 
 add_executable(${PROJECT_NAME} ${SRCS})
-target_link_libraries(${PROJECT_NAME} ${OpenSSL_LDFLAGS} ${WEBSOCK_LDFLAGS} ${JSON_LDFLAGS} ${GLIB2_LDFLAGS} ${GIO2_LDFLAGS})
+target_link_libraries(${PROJECT_NAME} ${OpenSSL_LDFLAGS} ${WEBSOCK_LDFLAGS} ${JSON_LDFLAGS} ${GLIB2_LDFLAGS} ${GIO2_LDFLAGS} devman)
 
 install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION usr/bin)

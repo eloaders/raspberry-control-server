@@ -7,7 +7,7 @@ Raspberry Control - Control Raspberry Pi with your Android Device
 
 sudo apt-get update
 sudo apt-get upgrade
-sudo apt-get install cmake libssl-dev libudev-dev libglib2.0-dev libjansson4 libjansson-dev
+sudo apt-get install cmake libssl-dev libglib2.0-dev libjansson4 libjansson-dev
 
 git clone https://github.com/lukasz-skalski/libwebsockets.git
 cd libwebsockets

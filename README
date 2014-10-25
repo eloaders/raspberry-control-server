@@ -25,15 +25,30 @@ make
 ./raspberry-control-server --port=8080 -n
 
 
-shellinabox
-===========
+shellinabox (Terminal Emulator)
+===============================
 
 sudo apt-get install shellinabox
 /usr/bin/shellinaboxd -q --background=/var/run/shellinaboxd.pid -c /var/lib/shellinabox -p 8081 -t
 
 
-LIRC
-====
+mjpg-streamer (Webcam Surveillance)
+===================================
+
+apt-get install libv4l-dev libjpeg8-dev imagemagick
+
+cd $HOME
+git clone https://github.com/lukasz-skalski/mjpg-streamer.git
+
+cd mjpg-streamer/mjpg-streamer-experimental
+make
+
+export LD_LIBRARY_PATH=.
+./mjpg_streamer -o "output_http.so -p 8082 -w ./www" -i "input_raspicam.so -x 640 -y 480 -fps 20 -ex night"
+
+
+LIRC (IR Remote Control)
+========================
 
 sudo apt-get install lirc
 
@@ -75,8 +90,8 @@ LIRCMD_CONF=""
 cp ~/lircd.conf /etc/lirc/lircd.conf
 
 
-DS18B20 Sensors
-===============
+DS18B20 Sensors (Temperature Sensors)
+=====================================
 
 vi /etc/modules (add two below lines)
 

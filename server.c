@@ -774,9 +774,34 @@ cmd_GetStatistics (struct libwebsocket *wsi, unsigned char *buffer)
  * cmd_SendIR()
  */
 unsigned int
-cmd_SendIR (struct libwebsocket *wsi, unsigned char *buffer)
+cmd_SendIR (struct libwebsocket *wsi, unsigned char *buffer, char *args)
 {
+  char *cmd;
+  int ret;
+
   print_log (LOG_INFO, "(%p) (cmd_SendIR) processing request\n", wsi);
+
+  ret = asprintf (&cmd, "irsend SEND_ONCE %s", args);
+  if (ret < 0)
+    {
+      print_log (LOG_ERR, "(%p) (cmd_SendIR) can't prepare LIRC command\n", wsi);
+      return send_error (buffer, "Can't prepare LIRC command");
+    }
+
+  /*
+   * Invoking system() function is temporary solution - we'll switch soon to
+   * liblirc_client and lirc_send_one() - which will be available in next lirc
+   * release.
+   */
+  ret = system (cmd);
+  if (ret != 0)
+    {
+      print_log (LOG_ERR, "(%p) (cmd_SendIR) can't send signal\n", wsi);
+      free (cmd);
+      return send_error (buffer, "Can't send signal - please check server's log");
+    }
+
+  free (cmd);
   return 0;
 }
 
@@ -909,7 +934,7 @@ parse_json (struct libwebsocket *wsi, unsigned char *data,
   else if (strcmp(cmd_str, "GetStatistics") == 0)
     len = cmd_GetStatistics (wsi, buffer);
   else if (strcmp(cmd_str, "SendIR") == 0)
-    len = cmd_SendIR (wsi, buffer);
+    len = cmd_SendIR (wsi, buffer, args_str);
   else if (strcmp(cmd_str, "SetGPIO") == 0)
     len = cmd_SetGPIO (wsi, buffer, args_str);
   else if (strcmp(cmd_str, "KillProcess") == 0)

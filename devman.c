@@ -100,3 +100,66 @@ double total_mem_usage(const struct devman_ctx *ctx, bool swap) {
 	return (double) (ctx->sysinfo->totalram - ctx->sysinfo->freeram)
 			/ ctx->sysinfo->totalram * 100.0;
 }
+
+enum {
+	CPU_STATE_USER,
+	CPU_STATE_NICE,
+	CPU_STATE_SYSTEM,
+	CPU_STATE_IDLE,
+	CPU_STATE_IOWAIT,
+	CPU_STATE_IRQ,
+	CPU_STATE_SOFTIRQ,
+	CPU_STATE_STEAL,
+	CPU_STATE_GUEST,
+	CPU_STATE_GUEST_NICE,
+	_CPU_STATE_COUNT
+};
+
+#define cpu_stats_to_arr(fp, arr) \
+		fscanf(fp, "cpu %"SCNu64"%"SCNu64"%"SCNu64"%"SCNu64"%"SCNu64"%"SCNu64"%"SCNu64"%"SCNu64"%"SCNu64"%"SCNu64"\n", \
+				&arr[0], &arr[1], &arr[2], &arr[3], &arr[4], &arr[5], &arr[6], &arr[7], &arr[8], &arr[9])
+
+double total_cpu_usage(void)
+{
+	FILE *fp;
+	int r;
+	uint64_t total1, work1, total2, work2;
+	uint64_t vals1[_CPU_STATE_COUNT] = {0,};
+	uint64_t vals2[_CPU_STATE_COUNT] = {0,};
+
+	fp = fopen("/proc/stat","r");
+	if (fp == NULL)
+		return -1.0;
+
+	r = cpu_stats_to_arr(fp, vals1);
+	if (r < 4 || (r == EOF && ferror(fp)))
+		goto fail;
+
+	rewind(fp);
+	sleep(1);
+	fflush(fp);
+
+	r = cpu_stats_to_arr(fp, vals2);
+	if (r < 4 || (r == EOF && ferror(fp)))
+		goto fail;
+
+	fclose(fp);
+
+	work1 = vals1[CPU_STATE_USER] + vals1[CPU_STATE_NICE] + vals1[CPU_STATE_SYSTEM] +
+		vals1[CPU_STATE_IRQ] + vals1[CPU_STATE_SOFTIRQ] + vals1[CPU_STATE_STEAL] +
+		vals1[CPU_STATE_GUEST] + vals1[CPU_STATE_GUEST_NICE];
+	total1 = work1 + vals1[CPU_STATE_IDLE]  + vals2[CPU_STATE_IOWAIT];
+
+	work2 = vals2[CPU_STATE_USER] + vals2[CPU_STATE_NICE] + vals2[CPU_STATE_SYSTEM] +
+		vals2[CPU_STATE_IRQ] + vals2[CPU_STATE_SOFTIRQ] + vals2[CPU_STATE_STEAL] +
+		vals2[CPU_STATE_GUEST] + vals2[CPU_STATE_GUEST_NICE];
+	total2 = work2 + vals2[CPU_STATE_IDLE]  + vals2[CPU_STATE_IOWAIT];
+
+	return (double)(work2 - work1) / (total2 - total1) * 100.0;
+
+fail:
+	r = errno;
+	fclose(fp);
+	errno = r;
+	return -1.0;
+}

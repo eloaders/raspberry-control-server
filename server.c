@@ -17,6 +17,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+#define _GNU_SOURCE
 #include <gio/gio.h>
 #include <glib-unix.h>
 #include <stdio.h>
@@ -111,7 +112,7 @@ print_log (gint msg_priority, const gchar *msg, ...)
  * SIGINT handler
  */
 static gboolean
-sigint_handler (gpointer user_data)
+sigint_handler ()
 {
   libwebsocket_cancel_service (context);
   exit_loop = TRUE;
@@ -142,7 +143,10 @@ gboolean check_board_revision ()
           fileline [strlen(fileline)-1] = 0;
           ptr = strstr (fileline, ":");
 	  if (ptr == NULL)
-            return FALSE;
+            {
+              fclose (fd);
+              return FALSE;
+            }
 
           ptr += 2;
           strncpy (board_revision, ptr, 4);
@@ -151,6 +155,7 @@ gboolean check_board_revision ()
         }
     }
 
+  fclose (fd);
   return TRUE;
 }
 
@@ -901,8 +906,9 @@ error:
  * parse_json()
  */
 unsigned int
-parse_json (struct libwebsocket *wsi, unsigned char *data,
-            size_t data_size, unsigned char *buffer)
+parse_json (struct libwebsocket  *wsi,
+            unsigned char        *data,
+            unsigned char        *buffer)
 {
   json_t *root;
   json_error_t error;
@@ -998,7 +1004,7 @@ raspberry_control_callback (struct libwebsocket_context *context,
             return 1;
           }
 
-        psd->len = parse_json (wsi, in, len, &psd->buf[LWS_SEND_BUFFER_PRE_PADDING]);
+        psd->len = parse_json (wsi, in, &psd->buf[LWS_SEND_BUFFER_PRE_PADDING]);
         if (psd->len > 0)
           {
             libwebsocket_callback_on_writable (context, wsi);

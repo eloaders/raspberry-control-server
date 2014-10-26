@@ -18,6 +18,7 @@ int devman_ctx_update(struct devman_ctx *ctx);
 
 char *get_kernel_version(const struct devman_ctx *ctx);
 char *get_uptime_str(const struct devman_ctx *ctx);
+char *get_cpuload_str(const struct devman_ctx *ctx);
 double total_mem_usage(const struct devman_ctx *ctx, bool swap);
 double total_cpu_usage(void);
 

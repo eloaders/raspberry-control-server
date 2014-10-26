@@ -91,12 +91,32 @@ char *get_uptime_str(const struct devman_ctx *ctx)
 	return uptime;
 }
 
-double total_mem_usage(const struct devman_ctx *ctx, bool swap) {
+char *get_cpuload_str(const struct devman_ctx *ctx)
+{
+	char *load; 
+
+	assert(ctx);
+		
+	load = malloc(LINE_MAX);
+	if (load == NULL)
+		return NULL;
+
+	snprintf(load, LINE_MAX, "%#.2g %#.2g %#.2g",
+			(double)(ctx->sysinfo->loads[0] / (double)(1 << SI_LOAD_SHIFT)),
+			(double)(ctx->sysinfo->loads[1] / (double)(1 << SI_LOAD_SHIFT)),
+			(double)(ctx->sysinfo->loads[2] / (double)(1 << SI_LOAD_SHIFT)));
+
+	return load;
+}
+
+double total_mem_usage(const struct devman_ctx *ctx, bool swap)
+{
 	assert(ctx);
 	
 	if (swap)
 		return (double) (ctx->sysinfo->totalswap - ctx->sysinfo->freeswap)
 			/ ctx->sysinfo->totalswap * 100.0;
+
 	return (double) (ctx->sysinfo->totalram - ctx->sysinfo->freeram)
 			/ ctx->sysinfo->totalram * 100.0;
 }

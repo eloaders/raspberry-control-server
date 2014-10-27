@@ -4,8 +4,8 @@ project(raspberry-control-server)
 
 enable_language(C)
 
-set(CMAKE_C_FLAGS_DEBUG "-Wall -Wextra -DDEBUG -O0 -pipe")
-set(CMAKE_C_FLAGS_RELEASE "-Wall -Wextra -O2 -pipe -fomit-frame-pointer")
+set(CMAKE_C_FLAGS_DEBUG "-Wall -Wextra -Wno-missing-field-initializers -DDEBUG -O0 -pipe")
+set(CMAKE_C_FLAGS_RELEASE "-Wall -Wextra -Wno-missing-field-initializers -O2 -pipe -fomit-frame-pointer")
 
 find_package(PkgConfig REQUIRED)
 find_package(OpenSSL REQUIRED)

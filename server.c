@@ -42,6 +42,7 @@
  */
 static struct libwebsocket_context *context;
 char board_revision[4];
+char *notification;
 
 gboolean opt_use_ssl = FALSE;
 gboolean opt_no_daemon = FALSE;
@@ -159,6 +160,7 @@ gboolean check_board_revision ()
   return TRUE;
 }
 
+
 /*
  * dbus_notification_callback()
  */
@@ -170,10 +172,33 @@ void dbus_notification_callback (GDBusConnection  *connection,
                                  GVariant         *parameters,
                                  gpointer          user_data)
 {
+  json_t *notification_obj;
+  char *notification_msg;
+
   print_log (LOG_INFO, "(notification) NOTIFICATION\n");
 
-  /* TODO - prepare data here */
-  //send_notification = TRUE;
+  send_notification = FALSE;
+  notification_msg = NULL;
+  free (notification);
+
+  /* UDisk - 'DeviceAdded' */
+  if ((strcmp(interface_name, "org.freedesktop.UDisks") == 0) &&
+      (strcmp(signal_name, "DeviceAdded") == 0))
+      asprintf (&notification_msg, "[UDisks] %s", signal_name);
+
+  /* CUPS - 'JobQueuedLocal' */
+  if (strcmp(signal_name, "JobQueuedLocal") == 0)
+    asprintf (&notification_msg, "[CUPS] %s", signal_name);
+
+  if (!notification_msg)
+    asprintf (&notification_msg, "(not set)");
+
+  notification_obj = json_pack ("{s:s}", "Notification", notification_msg);
+  notification = json_dumps (notification_obj, 0);
+
+  free (notification_msg);
+  json_decref (notification_obj);
+  send_notification = TRUE;
 }
 
 
@@ -225,6 +250,7 @@ send_error (unsigned char *buffer, const char *error)
   error_len = strlen (error_str);
   memcpy (buffer, error_str, error_len);
 
+  json_decref (error_obj);
   free (error_str);
   return error_len;
 }
@@ -982,7 +1008,18 @@ raspberry_control_callback (struct libwebsocket_context *context,
       break;
 
       case LWS_CALLBACK_SERVER_WRITEABLE:
+
+        /* broadcast message */
+        if (psd->buf[LWS_SEND_BUFFER_PRE_PADDING] == 0)
+          {
+            psd->len = strlen (notification);
+            if (psd->len == 0)
+              return 0;
+            memcpy (&psd->buf[LWS_SEND_BUFFER_PRE_PADDING], notification, psd->len);
+          }
+
         nbytes = libwebsocket_write(wsi, &psd->buf[LWS_SEND_BUFFER_PRE_PADDING], psd->len, LWS_WRITE_TEXT);
+        memset (&psd->buf[LWS_SEND_BUFFER_PRE_PADDING], 0, psd->len);
         print_log (LOG_INFO, "(%p) (callback) %d bytes written\n", wsi, nbytes);
         if (nbytes < 0)
           {
@@ -1156,7 +1193,10 @@ main(int argc, char **argv)
       cnt = libwebsocket_service (context, 10);
 
       if (send_notification)
-        libwebsocket_callback_on_writable_all_protocol (&protocols[0]);
+        {
+          libwebsocket_callback_on_writable_all_protocol (&protocols[0]);
+          send_notification = FALSE;
+        }
 
       g_main_context_iteration (NULL, FALSE);
     }

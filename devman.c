@@ -1,15 +1,19 @@
+/* Welcome in the land of OCD! */
+#include "util.h"
 #include "devman.h"
 
 #include <time.h>
 #include <errno.h>
 #include <stdio.h>
 #include <assert.h>
+#include <dirent.h>
 #include <limits.h>
 #include <mntent.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <inttypes.h>
+#include <sys/types.h>
 #include <sys/statfs.h>
 #include <sys/sysinfo.h>
 #include <sys/utsname.h>
@@ -107,6 +111,78 @@ char *get_cpuload_str(const struct devman_ctx *ctx)
 			(double)(ctx->sysinfo->loads[2] / (double)(1 << SI_LOAD_SHIFT)));
 
 	return load;
+}
+
+int get_netdevices(char ***devices, bool (*filter)(const char *))
+{
+	DIR *sys;
+	struct dirent *ent;
+	FILE *fp = NULL;
+	char **arr = NULL;
+	char path[PATH_MAX] = {0,};
+	char addr[18] = {[17]0};
+	int r = 0, n = 0;
+
+	sys = opendir("/sys/class/net");
+	if (sys == NULL)
+		return -1;
+
+	errno = 0;
+	for(ent = readdir(sys); ent; ent = readdir(sys)) {
+		if (ent->d_name[0] == '.')
+			continue;
+		++n;
+	}
+	if (errno)
+		goto fail;
+
+	arr = malloc(n * sizeof(*arr));
+	if (arr == NULL)
+		goto fail;
+
+	rewinddir(sys);
+	errno = 0;
+	for (ent = readdir(sys); ent; ent = readdir(sys)) {
+		if ((filter && !filter(ent->d_name)) || ent->d_name[0] == '.')
+			continue;
+
+		if (snprintf(path, PATH_MAX, "/sys/class/net/%s/address", ent->d_name) < 0)
+			goto fail;
+		fp = fopen(path, "r");
+		if (fp == NULL)
+			goto fail;
+
+		if (fscanf(fp, "%17s\n", addr) < 1)
+			goto fail;
+
+		arr[r] = malloc(20+strlen(ent->d_name)); /* addr + ":" + " "  */
+		if (arr[r] == NULL) {
+			++r;
+			goto fail;
+		}
+
+		sprintf(arr[r++], "%s: %s", ent->d_name, addr);
+		fclose(fp);
+		fp = NULL;
+	}
+	if (errno)
+		goto fail;
+
+	*devices = realloc(arr, r * sizeof(*arr));
+	if (*devices == NULL)
+		goto fail;
+	closedir(sys);
+	return r; /* number of allocated elements  */
+fail:
+	n = errno;
+	closedir(sys);
+	if (fp)
+		fclose(fp);
+	errno = n;
+	if (arr)
+		FREE_ARRAY_ELEMENTS(arr, n, r);
+	free(arr);
+	return -1;
 }
 
 double total_mem_usage(const struct devman_ctx *ctx, bool swap)

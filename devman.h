@@ -19,6 +19,7 @@ int devman_ctx_update(struct devman_ctx *ctx);
 char *get_kernel_version(const struct devman_ctx *ctx);
 char *get_uptime_str(const struct devman_ctx *ctx);
 char *get_cpuload_str(const struct devman_ctx *ctx);
+char *get_rpi_serial(void);
 int get_netdevices(char ***devices, bool (*filter)(const char *));
 double total_mem_usage(const struct devman_ctx *ctx, bool swap);
 double total_cpu_usage(void);

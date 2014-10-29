@@ -113,6 +113,33 @@ char *get_cpuload_str(const struct devman_ctx *ctx)
 	return load;
 }
 
+char *get_rpi_serial(void)
+{
+	FILE *fp;
+	char *serial;
+	char line[LINE_MAX] = {0,};
+
+	fp = fopen("/proc/cpuinfo", "r");
+	if (fp == NULL)
+		return NULL;
+
+	serial = malloc(LINE_MAX * sizeof(*serial));
+	if (serial == NULL)
+		goto end;
+
+	while (fgets(line, LINE_MAX, fp))
+		if (sscanf(line, "%*[Ss]erial : %s\n", serial))
+			break;
+
+	if (ferror(fp)) {
+		free(serial);
+		serial = NULL;
+	}
+end:
+	fclose(fp);
+	return serial;
+}
+
 int get_netdevices(char ***devices, bool (*filter)(const char *))
 {
 	DIR *sys;

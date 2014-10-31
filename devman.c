@@ -212,6 +212,55 @@ fail:
 	return -1;
 }
 
+/*TODO: filter should accept mntent structure instead of char *. */
+int get_df(char ***filesystems, bool (*filter)(const char *))
+{
+	struct statfs sfs;
+	struct mntent *ent;
+	uint64_t bytes_used, bytes_free;
+	int n = 0, r = 0;
+	char **arr = NULL;
+	FILE *fp = setmntent("/etc/mtab", "r");
+	if (fp == NULL)
+		return -1;
+
+	for (ent = getmntent(fp); ent; ent = getmntent(fp))
+		++n;
+
+	arr = malloc(n * sizeof(*arr));
+	if (arr == NULL)
+		goto fail;
+
+	rewind(fp);
+
+	for (ent = getmntent(fp); ent; ent = getmntent(fp)) {
+		if (filter && !filter(ent->mnt_dir))
+			continue;
+
+		if (statfs(ent->mnt_dir, &sfs) < 0 )
+			goto fail;
+
+		arr[r] = malloc(LINE_MAX);
+		if (arr[r] == NULL)
+			goto fail;
+
+		bytes_free = sfs.f_bfree * sfs.f_bsize;
+		bytes_used = (sfs.f_blocks - sfs.f_bfree) * sfs.f_bsize;
+		sprintf(arr[r++], "%s %s %"PRIu64" %"PRIu64, ent->mnt_fsname, ent->mnt_dir, bytes_used, bytes_free);
+	}
+	*filesystems = realloc(arr, r * sizeof(*arr));
+	if (*filesystems == NULL)
+		goto fail;
+	endmntent(fp);
+	return r;
+fail:
+	endmntent(fp);
+	if (arr)
+		FREE_ARRAY_ELEMENTS(arr, n, r);
+	free(arr);
+	return -1;
+};
+
 double total_mem_usage(const struct devman_ctx *ctx, bool swap)
 {
 	assert(ctx);

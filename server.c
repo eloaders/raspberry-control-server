@@ -18,6 +18,11 @@
  */
 
 #define _GNU_SOURCE
+
+#include "util.h"
+#include "devman.h"
+
+#include <inttypes.h>
 #include <gio/gio.h>
 #include <glib-unix.h>
 #include <stdio.h>
@@ -735,32 +740,58 @@ cmd_GetProcesses (struct libwebsocket *wsi, unsigned char *buffer)
  * }
  *
  */
+bool eth_filter(const char *name)
+{
+	if (strcmp(name, "eth0") == 0)
+		return true;
+	return false;
+}
+
+bool fs_filter(const char *name)
+{
+	if (strcmp(name, "/") == 0)
+		return true;
+	return false;
+}
+
 unsigned int
 cmd_GetStatistics (struct libwebsocket *wsi, unsigned char *buffer)
 {
   json_t *stat_obj;
   char *stat_str;
   int stat_len;
+  struct devman_ctx *dctx;
 
   char *kernel, *uptime, *serial, *mac_addr, *cpu_load;
   int ram_usage, swap_usage, cpu_temp, cpu_usage;
-  float used_space, free_space;
+  double used_space, free_space;
+  uint64_t sused, sfree;
+  char **arr;
+  int i, n;
 
   print_log (LOG_INFO, "(%p) (cmd_GetStatistics) processing request\n", wsi);
 
-  //Maciek, please add your code here!
-  kernel = "3.2.27+";
-  uptime = "1h 16m 39s";
-  serial = "00000000b62b4ab1";
-  mac_addr = "a1:eb:27:13:aa:b3";
-  used_space = (float) (rand() % 101);
-  free_space=  (float) (rand() % 101);
-  ram_usage=  rand() % 101;
-  swap_usage=  rand() % 101;
-  cpu_load = "0.00 0.01 0.05";
-  cpu_temp=  rand() % 101;
-  cpu_usage=  rand() % 101;
-  //
+  dctx = devman_ctx_init();
+  if (dctx == NULL)
+	  return 0;
+
+  kernel = get_kernel_version(dctx);
+  uptime = get_uptime_str(dctx);
+  serial = get_rpi_serial();
+  n = get_netdevices(&arr, eth_filter);
+  mac_addr = NULL;
+  sscanf(arr[0], "%*[a-z0-9:] %ms", &mac_addr);
+  FREE_ARRAY_ELEMENTS(arr, i, n);
+  n = get_df(&arr, fs_filter);
+  sscanf(arr[0], "%*s %*s %"SCNu64" %"SCNu64, &sused, &sfree);
+  used_space = sused / 1024.0 / 1024.0 / 1024.0;
+  free_space = sfree / 1024.0 / 1024.0 / 1024.0;
+  FREE_ARRAY_ELEMENTS(arr, i, n);
+  ram_usage =  total_mem_usage(dctx, false);
+  swap_usage =  total_mem_usage(dctx, true);
+  cpu_load = get_cpuload_str(dctx);
+  cpu_temp =  get_rpi_cpu_temp();
+  cpu_usage = total_cpu_usage();
 
   stat_obj = json_pack ("{s:{s:s, s:s, s:s, s:s, s:f, s:f, s:i, s:i, s:s, s:i, s:i}}",
                         "Statistics",
@@ -797,6 +828,11 @@ cmd_GetStatistics (struct libwebsocket *wsi, unsigned char *buffer)
 
   free (stat_str);
   json_decref (stat_obj);
+  free(kernel);
+  free(uptime);
+  free(serial);
+  free(mac_addr);
+  devman_ctx_free(dctx);
   return stat_len;
 }
 

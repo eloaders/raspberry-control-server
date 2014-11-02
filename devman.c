@@ -140,6 +140,18 @@ end:
 	return serial;
 }
 
+int get_rpi_cpu_temp(void)
+{
+	int temp;
+	FILE *fp = fopen("/sys/class/thermal/thermal_zone0/temp", "r");
+	if (fp == NULL)
+		return -1;
+	fscanf(fp, "%d\n", &temp);
+	fclose(fp);
+
+	return temp / 1000;
+}
+
 int get_netdevices(char ***devices, bool (*filter)(const char *))
 {
 	DIR *sys;

@@ -1,5 +1,5 @@
-#ifndef __RPS_UTIL
-#define __RPS_UTIL
+#ifndef __RCS_UTIL
+#define __RCS_UTIL
 
 /* Macros for arrays */
 
@@ -8,4 +8,4 @@
 		free(arr[i]); \
 	}
 
-#endif /* __RPS_UTIL */
+#endif /* __RCS_UTIL */

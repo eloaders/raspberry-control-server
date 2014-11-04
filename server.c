@@ -784,8 +784,8 @@ cmd_GetStatistics (struct libwebsocket *wsi, unsigned char *buffer)
   FREE_ARRAY_ELEMENTS(arr, i, n);
   n = get_df(&arr, fs_filter);
   sscanf(arr[0], "%*s %*s %"SCNu64" %"SCNu64, &sused, &sfree);
-  used_space = sused / 1024.0 / 1024.0 / 1024.0;
-  free_space = sfree / 1024.0 / 1024.0 / 1024.0;
+  used_space = sused / 1024.0 / 1024.0;
+  free_space = sfree / 1024.0 / 1024.0;
   FREE_ARRAY_ELEMENTS(arr, i, n);
   ram_usage =  total_mem_usage(dctx, false);
   swap_usage =  total_mem_usage(dctx, true);

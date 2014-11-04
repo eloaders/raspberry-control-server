@@ -299,7 +299,7 @@ enum {
 	_CPU_STATE_COUNT
 };
 
-#define cpu_stats_to_arr(fp, arr) \
+#define CPU_STATS_TO_ARR(fp, arr) \
 		fscanf(fp, "cpu %"SCNu64"%"SCNu64"%"SCNu64"%"SCNu64"%"SCNu64"%"SCNu64"%"SCNu64"%"SCNu64"%"SCNu64"%"SCNu64"\n", \
 				&arr[0], &arr[1], &arr[2], &arr[3], &arr[4], &arr[5], &arr[6], &arr[7], &arr[8], &arr[9])
 
@@ -315,7 +315,7 @@ double total_cpu_usage(void)
 	if (fp == NULL)
 		return -1.0;
 
-	r = cpu_stats_to_arr(fp, vals1);
+	r = CPU_STATS_TO_ARR(fp, vals1);
 	if (r < 4 || (r == EOF && ferror(fp)))
 		goto fail;
 
@@ -323,7 +323,7 @@ double total_cpu_usage(void)
 	sleep(1);
 	fflush(fp);
 
-	r = cpu_stats_to_arr(fp, vals2);
+	r = CPU_STATS_TO_ARR(fp, vals2);
 	if (r < 4 || (r == EOF && ferror(fp)))
 		goto fail;
 

@@ -4,7 +4,7 @@ project(raspberry-control-server)
 
 enable_language(C)
 
-set(CMAKE_C_FLAGS_DEBUG "-Wall -Wextra -Wno-missing-field-initializers -DDEBUG -O0 -pipe")
+set(CMAKE_C_FLAGS_DEBUG "-Wall -Wextra -Wno-missing-field-initializers -DDEBUG -g -O0 -pipe")
 set(CMAKE_C_FLAGS_RELEASE "-Wall -Wextra -Wno-missing-field-initializers -O2 -pipe -fomit-frame-pointer")
 
 find_package(PkgConfig REQUIRED)

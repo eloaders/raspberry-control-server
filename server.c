@@ -1,6 +1,7 @@
 /* Raspberry Control - Control Raspberry Pi with your Android Device
  *
  * Copyright (C) Lukasz Skalski <lukasz.skalski@op.pl>
+ * Copyright (C) Maciej Wereski <maciekwer@wp.pl>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -122,46 +123,6 @@ sigint_handler ()
 {
   libwebsocket_cancel_service (context);
   exit_loop = TRUE;
-  return TRUE;
-}
-
-
-/*
- * check_board_revision()
- */
-gboolean check_board_revision ()
-{
-  FILE *fd;
-  char fileline [200];
-  char *ptr;
-
-  fd = fopen("/proc/cpuinfo", "r");
-  if (!fd)
-    return FALSE;
-
-  while (1)
-    {
-      if (fgets (fileline, 200, fd) == NULL)
-        break;
-
-      if (strncmp(fileline, "Revision", 8) == 0)
-        {
-          fileline [strlen(fileline)-1] = 0;
-          ptr = strstr (fileline, ":");
-	  if (ptr == NULL)
-            {
-              fclose (fd);
-              return FALSE;
-            }
-
-          ptr += 2;
-          strncpy (board_revision, ptr, 4);
-          print_log (LOG_INFO, "(main) Board Revision: %s\n", board_revision);
-          break;
-        }
-    }
-
-  fclose (fd);
   return TRUE;
 }
 
@@ -755,29 +716,28 @@ bool fs_filter(const char *name)
 }
 
 unsigned int
-cmd_GetStatistics (struct libwebsocket *wsi, unsigned char *buffer)
+cmd_GetStatistics (struct libwebsocket *wsi, unsigned char *buffer, struct devman_ctx *dctx)
 {
   json_t *stat_obj;
   char *stat_str;
   int stat_len;
-  struct devman_ctx *dctx;
 
-  char *kernel, *uptime, *serial, *mac_addr, *cpu_load;
+  const char *serial;
+  char *kernel, *uptime, *mac_addr, *cpu_load;
   int ram_usage, swap_usage, cpu_temp, cpu_usage;
   double used_space, free_space;
   uint64_t sused, sfree;
   char **arr;
   int i, n;
 
-  print_log (LOG_INFO, "(%p) (cmd_GetStatistics) processing request\n", wsi);
+  assert(dctx != NULL);
 
-  dctx = devman_ctx_init();
-  if (dctx == NULL)
-	  return 0;
+  devman_ctx_update(dctx);
+  print_log (LOG_INFO, "(%p) (cmd_GetStatistics) processing request\n", wsi);
 
   kernel = get_kernel_version(dctx);
   uptime = get_uptime_str(dctx);
-  serial = get_rpi_serial();
+  serial = get_board_serial(dctx);
   n = get_netdevices(&arr, eth_filter);
   mac_addr = NULL;
   sscanf(arr[0], "%*[a-z0-9:] %ms", &mac_addr);
@@ -790,7 +750,7 @@ cmd_GetStatistics (struct libwebsocket *wsi, unsigned char *buffer)
   ram_usage =  total_mem_usage(dctx, false);
   swap_usage =  total_mem_usage(dctx, true);
   cpu_load = get_cpuload_str(dctx);
-  cpu_temp =  get_rpi_cpu_temp();
+  cpu_temp =  get_board_cpu_temp();
   cpu_usage = total_cpu_usage();
 
   stat_obj = json_pack ("{s:{s:s, s:s, s:s, s:s, s:f, s:f, s:i, s:i, s:s, s:i, s:i}}",
@@ -830,9 +790,7 @@ cmd_GetStatistics (struct libwebsocket *wsi, unsigned char *buffer)
   json_decref (stat_obj);
   free(kernel);
   free(uptime);
-  free(serial);
   free(mac_addr);
-  devman_ctx_free(dctx);
   return stat_len;
 }
 
@@ -970,7 +928,8 @@ error:
 unsigned int
 parse_json (struct libwebsocket  *wsi,
             unsigned char        *data,
-            unsigned char        *buffer)
+            unsigned char        *buffer,
+	    struct devman_ctx    *dctx)
 {
   json_t *root;
   json_error_t error;
@@ -1000,7 +959,7 @@ parse_json (struct libwebsocket  *wsi,
   else if (strcmp(cmd_str, "GetProcesses") == 0)
     len = cmd_GetProcesses (wsi, buffer);
   else if (strcmp(cmd_str, "GetStatistics") == 0)
-    len = cmd_GetStatistics (wsi, buffer);
+    len = cmd_GetStatistics (wsi, buffer, dctx);
   else if (strcmp(cmd_str, "SendIR") == 0)
     len = cmd_SendIR (wsi, buffer, args_str);
   else if (strcmp(cmd_str, "SetGPIO") == 0)
@@ -1027,7 +986,8 @@ static int
 raspberry_control_callback (struct libwebsocket_context *context,
 	                    struct libwebsocket *wsi,
 	                    enum libwebsocket_callback_reasons reason,
-                            void *user, void *in, size_t len)
+                            void *user, void *in, size_t len,
+			    struct devman_ctx *dctx)
 {
   struct per_session_data *psd = (struct per_session_data*) user;
   int nbytes;
@@ -1077,7 +1037,7 @@ raspberry_control_callback (struct libwebsocket_context *context,
             return 1;
           }
 
-        psd->len = parse_json (wsi, in, &psd->buf[LWS_SEND_BUFFER_PRE_PADDING]);
+        psd->len = parse_json (wsi, in, &psd->buf[LWS_SEND_BUFFER_PRE_PADDING], dctx);
         if (psd->len > 0)
           {
             libwebsocket_callback_on_writable (context, wsi);
@@ -1121,10 +1081,17 @@ main(int argc, char **argv)
   char key_path [1024];
   char *res_path = "/path/to/cert";
 
+  struct devman_ctx *dctx;
+
   gint cnt = 0;
   gint signal_id = 0;
   gint exit_value = EXIT_SUCCESS;
   struct lws_context_creation_info info;
+
+  /* Initialize device manager context */
+  dctx = devman_ctx_init();
+  if (dctx == NULL)
+	  return EXIT_FAILURE;
 
   /* parse commandline options */
   option_context = g_option_context_new ("- Raspberry Control Daemon");
@@ -1190,7 +1157,7 @@ main(int argc, char **argv)
     }
 
   /* check board revision */
-  if (!check_board_revision())
+  if (!get_board_revision(dctx))
     print_log (LOG_ERR, "(main) Something goes wrong - can't check board revision\n");
 
   /* connect to the bus */

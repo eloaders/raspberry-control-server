@@ -1,4 +1,23 @@
-/* Welcome in the land of OCD! */
+/* Raspberry Control - Control Raspberry Pi with your Android Device
+ *
+ * Copyright (C) Lukasz Skalski <lukasz.skalski@op.pl>
+ * Copyright (C) Maciej Wereski <maciekwer@wp.pl>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ */
+
 #include "util.h"
 #include "devman.h"
 
@@ -17,6 +36,24 @@
 #include <sys/statfs.h>
 #include <sys/sysinfo.h>
 #include <sys/utsname.h>
+#include <time.h>
+
+struct utsname;
+struct sysinfo;
+
+struct board_info {
+        char *serial;
+        char *revision;
+};
+
+struct devman_ctx {
+        struct utsname *uname;
+        struct sysinfo *sysinfo;
+        struct board_info board_info;
+        time_t last_update;
+};
+
+static int get_board_info(struct board_info *info);
 
 struct devman_ctx *devman_ctx_init(void)
 {
@@ -30,19 +67,34 @@ struct devman_ctx *devman_ctx_init(void)
 	ctx->sysinfo = malloc(sizeof(*ctx->sysinfo));
 	ctx->last_update = 0;
 
-	if (ctx->uname == NULL || ctx->sysinfo == NULL || devman_ctx_update(ctx) < 0) {
-		free(ctx->uname);
-		free(ctx->sysinfo);
-		free(ctx);
-		ctx = NULL;
-	}
+	if (ctx->uname == NULL || ctx->sysinfo == NULL || devman_ctx_update(ctx) < 0)
+		goto fail;
+
+	if (get_board_info(&ctx->board_info) < 0)
+		goto fail;
 
 	return ctx;
+fail:
+	free(ctx->uname);
+	free(ctx->sysinfo);
+	free(ctx);
+	return NULL;
+
+}
+
+static void free_board_info(struct board_info *info)
+{
+	assert(info);
+
+	free(info->serial);
+	free(info->revision);
 }
 
 void devman_ctx_free(struct devman_ctx *ctx)
 {
 	assert(ctx);
+
+	free_board_info(&ctx->board_info);
 	free(ctx->uname);
 	free(ctx->sysinfo);
 	free(ctx);
@@ -67,6 +119,52 @@ int devman_ctx_update(struct devman_ctx *ctx)
 	ctx->last_update = t;
 
 	return 0;
+}
+
+static int get_board_info(struct board_info *info)
+{
+	FILE *fp;
+	char *serial, *revision;
+	char line[LINE_MAX] = {0,};
+	int r = 0;
+
+	assert(info);
+	serial = revision = NULL;
+
+	fp = fopen("/proc/cpuinfo", "r");
+	if (fp == NULL)
+		return -1;
+
+	while (fgets(line, LINE_MAX, fp)) {
+		if (serial && revision)
+			break;
+
+		if (serial == NULL)
+			sscanf(line, "%*[Ss]erial : %ms\n", &serial);
+		if (revision == NULL)
+			sscanf(line, "%*[Rr]evision : %ms\n", &revision);
+	}
+
+	if (ferror(fp)) {
+		free(serial);
+		free(revision);
+		serial = revision = NULL;
+		r = -1;
+	}
+	fclose(fp);
+	info->serial = serial;
+	info->revision = revision;
+	return r;
+}
+
+const char *get_board_serial(const struct devman_ctx *ctx)
+{
+        return ctx->board_info.serial;
+}
+
+const char *get_board_revision(const struct devman_ctx *ctx)
+{
+        return ctx->board_info.revision;
 }
 
 char *get_kernel_version(const struct devman_ctx *ctx)
@@ -113,34 +211,7 @@ char *get_cpuload_str(const struct devman_ctx *ctx)
 	return load;
 }
 
-char *get_rpi_serial(void)
-{
-	FILE *fp;
-	char *serial;
-	char line[LINE_MAX] = {0,};
-
-	fp = fopen("/proc/cpuinfo", "r");
-	if (fp == NULL)
-		return NULL;
-
-	serial = malloc(LINE_MAX * sizeof(*serial));
-	if (serial == NULL)
-		goto end;
-
-	while (fgets(line, LINE_MAX, fp))
-		if (sscanf(line, "%*[Ss]erial : %s\n", serial))
-			break;
-
-	if (ferror(fp)) {
-		free(serial);
-		serial = NULL;
-	}
-end:
-	fclose(fp);
-	return serial;
-}
-
-int get_rpi_cpu_temp(void)
+int get_board_cpu_temp(void)
 {
 	int temp;
 	FILE *fp = fopen("/sys/class/thermal/thermal_zone0/temp", "r");

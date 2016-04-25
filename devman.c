@@ -23,10 +23,12 @@
 
 #include <time.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <assert.h>
 #include <dirent.h>
 #include <limits.h>
+#include <linux/limits.h>
 #include <mntent.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,6 +39,8 @@
 #include <sys/sysinfo.h>
 #include <sys/utsname.h>
 #include <time.h>
+
+#define GPIO_SYSFS_DIR "/sys/class/gpio/"
 
 struct utsname;
 struct sysinfo;
@@ -119,6 +123,83 @@ int devman_ctx_update(struct devman_ctx *ctx)
 	ctx->last_update = t;
 
 	return 0;
+}
+
+int gpio_control(unsigned int pin, bool enable)
+{
+	int fd, tmp, ret = 0;
+	ssize_t size;
+	char buf[LINE_MAX];
+	char file[PATH_MAX];
+
+	ret = snprintf(file, sizeof(file), "%s%s", GPIO_SYSFS_DIR, enable ? "export" : "unexport");
+	if (ret < 0)
+		return -1;
+
+	fd = open(file, O_WRONLY);
+	if (fd < 0)
+		return -1;
+
+	size = snprintf(buf, sizeof(buf), "%u", pin);
+	if (write(fd, buf, size) < 0) {
+		tmp = errno;
+		ret = -1;
+	}
+
+	close(fd);
+	if (ret < 0)
+		errno = tmp;
+	return ret;
+}
+
+//TODO: one function: gpio_getset_val + wrappers
+int gpio_set_value(unsigned int pin, unsigned int value)
+{
+	int fd, tmp;
+	char path[PATH_MAX];
+
+	if (value != 0 || value != 1) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	//TODO: check if pin is set to out
+	snprintf(path, sizeof(path), "%s%s%u", GPIO_SYSFS_DIR, "gpio", pin);
+	fd = open(path, O_WRONLY);
+	if (fd < 0)
+		return -1;
+
+	if (write(fd, &value, sizeof(value)) == -1){
+		tmp = errno;
+		close(fd);
+		errno = tmp;
+		return -1
+	}
+
+	close(fd);
+	return 0;
+}
+
+int gpio_get_value(unsigned int pin)
+{
+	int fd, tmp;
+	char path[PATH_MAX];
+	char value[2];
+
+	snprintf(path, sizeof(path), "%s%s%u", GPIO_SYSFS_DIR, "gpio", pin);
+	fd = open(path, O_RDONLY);
+	if (fd < 0)
+		return -1;
+
+	if (read(fd, value, sizeof(value)) < 0) {
+		value = '-1';
+		tmp = errno;
+		goto fail;
+	}
+
+	close(fd);
+	errno = tmp;
+	return atoi(value);
 }
 
 static int get_board_info(struct board_info *info)
